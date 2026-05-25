@@ -136,7 +136,7 @@
   #input-time  { width: 90px; flex-shrink: 0; }
   .add-bar input::placeholder { color: var(--text-dimmer); }
   .add-bar input:focus,
-  .add-bar select:focus       { box-shadow: 0 0 0 2px rgba(255,255,255,0.04); }
+  .add-bar select:focus       { box-shadow: 0 0 0 2px rgba(120,135,190,0.22); }
   .add-bar select option      { background: var(--bg3); }
 
   .btn-add {
@@ -250,7 +250,7 @@
     background: color-mix(in srgb, var(--ec) 6%, var(--bg2));
   }
 
-  /* Next-up badge (::before, safe since ::after is used for done bar) */
+  /* Next-up badge — uses ::before since ::after is the colour-tag bar */
   .entry.next-up::before {
     content: '▶ next';
     position: absolute; top: 5px; right: 8px;
@@ -462,16 +462,40 @@ let entries    = [];
 let nextId     = 1;
 let ctxId      = null;
 let editingId  = null;
+let _currentNextId = null;  // entry id currently showing the "next" badge
+
+// ── Cached DOM refs (stable elements queried once) ────────────────────────────
+const $ = {
+  clock:     document.getElementById('clock'),
+  clockDate: document.getElementById('clock-date'),
+  newBtn:    document.getElementById('btn-new-entry'),
+  newIcon:   document.getElementById('btn-new-icon'),
+  newLabel:  document.getElementById('btn-new-label'),
+  fields:    document.getElementById('add-fields'),
+  addBar:    document.getElementById('add-bar'),
+  name:      document.getElementById('input-name'),
+  day:       document.getElementById('input-day'),
+  time:      document.getElementById('input-time'),
+  notes:     document.getElementById('input-notes'),
+  link:      document.getElementById('input-link'),
+  submit:    document.getElementById('btn-submit'),
+  editLabel: document.getElementById('edit-label'),
+  schedule:  document.getElementById('schedule'),
+  ctxMenu:   document.getElementById('ctx-menu'),
+  themeIcon: document.getElementById('theme-icon'),
+};
 
 // ── Timezone ──────────────────────────────────────────────────────────────────
 const USER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+// Formatter is created once and reused — building it is the expensive part
+const _tzFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: USER_TZ, year:'numeric', month:'2-digit', day:'2-digit',
+  hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false
+});
+
 function nowInTZ() {
-  const now   = new Date();
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: USER_TZ, year:'numeric', month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false
-  }).formatToParts(now);
+  const parts = _tzFmt.formatToParts(new Date());
   const g = t => parseInt(parts.find(p => p.type === t).value);
   return new Date(Date.UTC(g('year'), g('month')-1, g('day'), g('hour'), g('minute'), g('second')));
 }
@@ -504,12 +528,19 @@ function normalizeEntries(arr) {
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
+// Guarantees the next id is always greater than every existing entry id,
+// even if the stored/imported nextId is missing or corrupted (prevents id collisions)
+function safeNextId(stored) {
+  const maxId = entries.reduce((m, e) => Math.max(m, e.id), 0);
+  return Math.max(Number(stored) || 0, maxId + 1);
+}
+
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (d) {
       entries = normalizeEntries(d.entries || []);
-      nextId  = d.nextId || 1;
+      nextId  = safeNextId(d.nextId);
       save(); // flush any legacy fields from storage
     }
   } catch {}
@@ -533,8 +564,7 @@ function checkMidnightReset(now) {
 }
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
-function msUntilNext(day, timeStr) {
-  const now   = nowInTZ();
+function msUntilNext(day, timeStr, now = nowInTZ()) {
   const [h,m] = timeStr.split(':').map(Number);
   let ahead   = (day - now.getUTCDay() + 7) % 7;
   const ch = now.getUTCHours(), cm = now.getUTCMinutes();
@@ -563,22 +593,27 @@ function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Next-up calculation ───────────────────────────────────────────────────────
-function getNextUpId() {
-  let minMs = Infinity, minId = null;
-  for (const e of entries) {
-    const ms = msUntilNext(e.day, e.time);
-    if (ms < minMs) { minMs = ms; minId = e.id; }
-  }
-  return minId;
-}
-
 // ── Full render ───────────────────────────────────────────────────────────────
 function render() {
-  const el    = document.getElementById('schedule');
-  const today = nowInTZ().getUTCDay();
+  const el    = $.schedule;
+  const now   = nowInTZ();
+  const today = now.getUTCDay();
+
+  // Single pass over entries: group by day, build countdown map, find next-up
+  const byDay = {};
+  const msMap = {};
+  let minMs = Infinity;
+  let nextId_up = null;
+  for (const e of entries) {
+    (byDay[e.day] ||= []).push(e);
+    const ms = msUntilNext(e.day, e.time, now);
+    msMap[e.id] = ms;
+    if (ms < minMs) { minMs = ms; nextId_up = e.id; }
+  }
+  _currentNextId = nextId_up;  // HTML below bakes next-up in for this id
+
   const order = Array.from({length:7}, (_,i) => (today+i)%7);
-  const days  = order.filter(d => entries.some(e => e.day === d));
+  const days  = order.filter(d => byDay[d]);
 
   if (!days.length) {
     el.innerHTML = '<p class="empty-state">No entries yet — add one above.</p>';
@@ -586,19 +621,9 @@ function render() {
   }
 
   let html = '';
-  // Build countdown map in one pass — also finds nextId_up
-  const msMap = {};
-  let minMs = Infinity;
-  let nextId_up = null;
-  for (const e of entries) {
-    const ms = msUntilNext(e.day, e.time);
-    msMap[e.id] = ms;
-    if (ms < minMs) { minMs = ms; nextId_up = e.id; }
-  }
-
   for (const day of days) {
     const isToday = day === today;
-    const list    = entries.filter(e => e.day === day).sort((a,b) => a.time.localeCompare(b.time));
+    const list    = byDay[day].sort((a,b) => a.time.localeCompare(b.time));
 
     html += `<div class="day-col${isToday ? ' today-col' : ''}">
       <div class="day-header">
@@ -643,10 +668,10 @@ function render() {
 
 // ── Countdown patch — no rebuild, no blink ────────────────────────────────────
 function refreshCountdowns() {
-  // Single pass: compute countdown for every entry, track minimum for next-up
+  const now = nowInTZ();
   let minMs = Infinity, nuId = null;
   for (const e of entries) {
-    const ms = msUntilNext(e.day, e.time);
+    const ms = msUntilNext(e.day, e.time, now);
     if (ms < minMs) { minMs = ms; nuId = e.id; }
     const cdEl = document.getElementById(`cd${e.id}`);
     if (cdEl) {
@@ -656,13 +681,18 @@ function refreshCountdowns() {
       if (cdEl.className   !== cls) cdEl.className   = cls;
     }
   }
-  for (const e of entries) {
-    document.getElementById(`e${e.id}`)?.classList.toggle('next-up', e.id === nuId);
+  // Move the next-up badge only if the winner changed (touches ≤2 elements)
+  if (nuId !== _currentNextId) {
+    if (_currentNextId !== null)
+      document.getElementById(`e${_currentNextId}`)?.classList.remove('next-up');
+    if (nuId !== null)
+      document.getElementById(`e${nuId}`)?.classList.add('next-up');
+    _currentNextId = nuId;
   }
 }
 
 // ── Context menu ──────────────────────────────────────────────────────────────
-const ctxMenu = document.getElementById('ctx-menu');
+const ctxMenu = $.ctxMenu;
 
 function openCtx(evt, id) {
   evt.preventDefault();
@@ -707,36 +737,37 @@ function ctxEdit() {
 
   editingId = e.id;
   openAddForm();
-  document.getElementById('input-name').value  = e.name;
-  document.getElementById('input-notes').value = e.notes;
-  document.getElementById('input-link').value  = e.link;
-  document.getElementById('input-day').value   = e.day;
-  document.getElementById('input-time').value  = e.time;
+  $.name.value  = e.name;
+  $.notes.value = e.notes;
+  $.link.value  = e.link;
+  $.day.value   = e.day;
+  $.time.value  = e.time;
 
-  const btn = document.getElementById('btn-submit');
-  btn.textContent = 'Save Changes';
-  btn.classList.add('saving');
-  document.getElementById('edit-label').classList.add('visible');
-  document.getElementById('add-bar').classList.add('editing');
+  $.submit.textContent = 'Save Changes';
+  $.submit.classList.add('saving');
+  $.editLabel.classList.add('visible');
+  $.addBar.classList.add('editing');
 
   // Mark the entry being edited without a full rebuild
   document.getElementById(`e${e.id}`)?.classList.add('editing-target');
-  document.getElementById('input-name').focus();
+  $.name.focus();
   closeCtx();
 }
 
 function cancelEdit() {
+  if (editingId !== null) {
+    document.getElementById(`e${editingId}`)?.classList.remove('editing-target');
+  }
   editingId = null;
-  document.getElementById('input-name').value  = '';
-  document.getElementById('input-notes').value = '';
-  document.getElementById('input-link').value  = '';
-  document.getElementById('input-time').value  = '16:00';
-  document.getElementById('input-day').value   = '1';
-  const btn = document.getElementById('btn-submit');
-  btn.textContent = '+ Add';
-  btn.classList.remove('saving');
-  document.getElementById('edit-label').classList.remove('visible');
-  document.getElementById('add-bar').classList.remove('editing');
+  $.name.value  = '';
+  $.notes.value = '';
+  $.link.value  = '';
+  $.time.value  = '16:00';
+  $.day.value   = '1';
+  $.submit.textContent = '+ Add';
+  $.submit.classList.remove('saving');
+  $.editLabel.classList.remove('visible');
+  $.addBar.classList.remove('editing');
   closeAddForm();
 }
 
@@ -754,36 +785,36 @@ document.addEventListener('keydown',     e => { if (e.key === 'Escape') { closeC
 
 // ── Add form toggle ───────────────────────────────────────────────────────────
 function openAddForm() {
-  document.getElementById('add-fields').classList.add('open');
-  document.getElementById('btn-new-entry').classList.add('open');
-  document.getElementById('btn-new-label').textContent = 'Close';
-  document.getElementById('btn-new-icon').innerHTML = '<path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
+  $.fields.classList.add('open');
+  $.newBtn.classList.add('open');
+  $.newLabel.textContent = 'Close';
+  $.newIcon.innerHTML = '<path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
 }
 function closeAddForm() {
-  document.getElementById('add-fields').classList.remove('open');
-  document.getElementById('btn-new-entry').classList.remove('open');
-  document.getElementById('btn-new-label').textContent = 'New Entry';
-  document.getElementById('btn-new-icon').innerHTML = '<path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
+  $.fields.classList.remove('open');
+  $.newBtn.classList.remove('open');
+  $.newLabel.textContent = 'New Entry';
+  $.newIcon.innerHTML = '<path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
 }
 function toggleAddForm() {
-  const isOpen = document.getElementById('add-fields').classList.contains('open');
+  const isOpen = $.fields.classList.contains('open');
   if (isOpen) {
     // If editing, cancel edit first
     if (editingId !== null) cancelEdit();
     else closeAddForm();
   } else {
     openAddForm();
-    document.getElementById('input-name').focus();
+    $.name.focus();
   }
 }
 function submitEntry() {
-  const name  = document.getElementById('input-name').value.trim();
-  const notes = document.getElementById('input-notes').value.trim();
-  const rawLink = document.getElementById('input-link').value.trim();
+  const name  = $.name.value.trim();
+  const notes = $.notes.value.trim();
+  const rawLink = $.link.value.trim();
   const link  = rawLink && !/^https?:\/\//i.test(rawLink) ? 'https://' + rawLink : rawLink;
-  const day   = parseInt(document.getElementById('input-day').value);
-  const time  = document.getElementById('input-time').value;
-  if (!name) { document.getElementById('input-name').focus(); return; }
+  const day   = parseInt($.day.value);
+  const time  = $.time.value;
+  if (!name) { $.name.focus(); return; }
 
   if (editingId !== null) {
     const e = entries.find(x => x.id === editingId);
@@ -793,19 +824,19 @@ function submitEntry() {
     render();
   } else {
     entries.push({ id: nextId++, day, time, name, notes, link, color: null });
-    document.getElementById('input-name').value  = '';
-    document.getElementById('input-notes').value = '';
-    document.getElementById('input-link').value  = '';
-    document.getElementById('input-name').focus();
+    $.name.value  = '';
+    $.notes.value = '';
+    $.link.value  = '';
+    $.name.focus();
     closeAddForm();
     save(); render();
   }
 }
 
-document.getElementById('input-name').addEventListener('keydown', e => {
+$.name.addEventListener('keydown', e => {
   if (e.key === 'Enter') submitEntry();
 });
-document.getElementById('input-notes').addEventListener('keydown', e => {
+$.notes.addEventListener('keydown', e => {
   if (e.key === 'Enter') submitEntry();
 });
 
@@ -829,7 +860,7 @@ function importData(input) {
       const d = JSON.parse(evt.target.result);
       if (!Array.isArray(d.entries)) throw new Error('Invalid format');
       entries = normalizeEntries(d.entries);
-      nextId  = d.nextId || (Math.max(0, ...entries.map(e => e.id)) + 1);
+      nextId  = safeNextId(d.nextId);
       save(); render();
     } catch {
       alert('Import failed: invalid or corrupted file.');
@@ -843,9 +874,9 @@ function importData(input) {
 function tick() {
   const now = nowInTZ();
   const p   = n => String(n).padStart(2,'0');
-  document.getElementById('clock').textContent =
+  $.clock.textContent =
     `${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())}`;
-  document.getElementById('clock-date').textContent =
+  $.clockDate.textContent =
     `${DAY_NAMES[now.getUTCDay()].toUpperCase()} · ${TZ_LABEL}`;
   checkMidnightReset(now);
 }
@@ -856,7 +887,7 @@ const SUN_SVG  = '<circle cx="6.5" cy="6.5" r="2.5" stroke="currentColor" stroke
 
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
-  document.getElementById('theme-icon').innerHTML = theme === 'light' ? MOON_SVG : SUN_SVG;
+  $.themeIcon.innerHTML = theme === 'light' ? MOON_SVG : SUN_SVG;
 }
 
 function toggleTheme() {
