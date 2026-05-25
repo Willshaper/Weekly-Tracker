@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #07080d;
+    --bg2:        #0e1018;
+    --bg3:        #161822;
+    --border:     #1f2230;
+    --border2:    #2a2d42;
+    --accent:     #e8615a;
+    --accent2:    #f0a04b;
+    --text:       #d4d6e8;
+    --text-dim:   #6b6f8a;
+    --text-dimmer:#3a3d52;
+    --done-bg:    #0d1a20;
+    --done-border:#1a3a40;
+    --cd-near:    #e8615a;
+    --cd-mid:     #f0a04b;
+    --cd-far:     #4fc4a8;   /* enable highlight — green-teal */
+    --today:      #3ab8d8;   /* today column — cyan-blue teal, same family, cooler hue */
+    --mono:   'DM Mono', monospace;
+    --sans:   'Noto Sans JP', sans-serif;
+    --display:'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.18;
+    pointer-events: none; z-index: 0;
+  }
+
+  .shell {
+    position: relative; z-index: 1;
+    height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 0 16px;
+  }
+
+  /* ── Header ── */
+  header {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0 9px;
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+  }
+
+  .header-left  { display: flex; align-items: baseline; gap: 10px; }
+  .header-mid   { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+  .header-right { font-family: var(--mono); text-align: right; margin-left: 16px; }
+
+  h1 { font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #fff; line-height: 1; }
+  h1 span { color: var(--accent); }
+  .header-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: #7a84a8; }
+  #clock { font-size: 17px; font-weight: 500; color: var(--text); letter-spacing: 0.06em; }
+  #clock-date { font-size: 9px; color: #7a84a8; letter-spacing: 0.14em; margin-top: 1px; }
+
+  .btn-io {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text-dim);
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em;
+    cursor: pointer; padding: 0 10px; height: 26px;
+    display: flex; align-items: center; gap: 5px;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .btn-io:hover { border-color: var(--border2); color: var(--text); }
+  .btn-io svg   { flex-shrink: 0; }
+  #import-file  { display: none; }
+
+  /* ── Add bar ── */
+  .add-bar {
+    flex-shrink: 0;
+    display: flex; flex-direction: column; gap: 5px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .add-bar.editing { border-bottom-color: rgba(59,184,216,0.35); }
+
+  .add-row { display: flex; gap: 8px; align-items: center; }
+
+  .add-bar input, .add-bar select {
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text);
+    font-family: var(--sans); font-size: 13px;
+    padding: 0 10px; outline: none;
+    transition: border-color 0.15s; height: 30px;
+  }
+  #input-name  { flex: 1.8; min-width: 0; }
+  #input-notes { flex: 1; min-width: 0; font-size: 12px; }
+  #input-day   { width: 115px; flex-shrink: 0; }
+  #input-time  { width: 90px; flex-shrink: 0; }
+  .add-bar input::placeholder { color: var(--text-dimmer); }
+  .add-bar input:focus,
+  .add-bar select:focus       { border-color: var(--accent); }
+  .add-bar select option      { background: var(--bg3); }
+
+  .btn-add {
+    background: var(--accent); border: none; border-radius: 6px;
+    color: #fff; cursor: pointer;
+    font-family: var(--display); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.04em; padding: 0 16px; height: 30px; flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-add:hover  { background: #f07570; transform: translateY(-1px); }
+  .btn-add.saving { background: var(--today); }
+  .btn-add.saving:hover { background: #50c8e8; }
+
+  .btn-cancel {
+    background: none; border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text-dim); cursor: pointer;
+    font-family: var(--mono); font-size: 11px;
+    padding: 0 10px; height: 30px; flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s;
+    display: none;
+  }
+  .btn-cancel:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-cancel.visible { display: block; }
+
+  .edit-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--today);
+    display: none; white-space: nowrap;
+  }
+  .edit-label.visible { display: block; }
+
+  /* ── Schedule ── */
+  #schedule {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: row;
+    gap: 0; padding: 10px 0 6px;
+    overflow: hidden;
+  }
+
+  .empty-state {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--text-dimmer); padding: 20px 0;
+    align-self: flex-start;
+  }
+
+  /* ── Day column ── */
+  .day-col {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column;
+    padding: 0 10px;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .day-col:first-child { padding-left: 0; }
+  .day-col:last-child  { border-right: none; padding-right: 0; }
+
+  /* Today column — cyan-teal (distinct from but family-matched with enable-highlight green-teal) */
+  .day-col.today-col {
+    background: rgba(58, 184, 216, 0.04);
+    border-radius: 8px;
+    margin: -6px -2px;
+    padding: 6px 12px;
+    border-right: none;
+    position: relative;
+  }
+  .day-col.today-col::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 8px;
+    border: 1px solid rgba(58, 184, 216, 0.22);
+    pointer-events: none;
+  }
+
+  /* ── Day header ── */
+  .day-header {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 7px; flex-shrink: 0;
+  }
+  .day-name {
+    font-family: var(--display); font-size: 9.5px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    font-weight: 700; color: var(--text-dimmer); white-space: nowrap;
+  }
+  .today-col .day-name { color: var(--today); font-size: 10px; }
+  .today-badge {
+    font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--today);
+    background: rgba(58,184,216,0.1); border: 1px solid rgba(58,184,216,0.25);
+    border-radius: 3px; padding: 1px 5px; white-space: nowrap;
+  }
+  .day-line  { flex: 1; height: 1px; background: var(--border); }
+  .today-col .day-line { background: rgba(58,184,216,0.2); }
+  .day-count { font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); flex-shrink: 0; }
+
+  /* ── Entries ── */
+  .entries-list { display: flex; flex-direction: column; gap: 4px; overflow: hidden; flex: 1; }
+
+  /* ── Entry card ── */
+  .entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 7px 10px 6px;
+    display: flex; flex-direction: column; gap: 2px;
+    cursor: context-menu;
+    user-select: none;
+    position: relative; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+
+  .today-col .entry  { border-color: rgba(58, 184, 216, 0.12); }
+  .entry:hover       { border-color: var(--border2); }
+
+  /* Enable Highlight */
+  .entry.done {
+    background: var(--done-bg);
+    border-color: var(--done-border) !important;
+    box-shadow: 0 0 0 1px rgba(79,196,168,0.1) inset;
+  }
+  .entry.done::after {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: var(--cd-far);
+    border-radius: 7px 0 0 7px;
+  }
+
+  /* Next-up badge (::before, safe since ::after is used for done bar) */
+  .entry.next-up::before {
+    content: '▶ next';
+    position: absolute; top: 5px; right: 8px;
+    font-family: var(--mono); font-size: 8px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent2);
+    background: rgba(240,160,75,0.1); border: 1px solid rgba(240,160,75,0.22);
+    border-radius: 3px; padding: 1px 5px;
+    pointer-events: none;
+  }
+
+  /* Editing indicator ring */
+  .entry.editing-target {
+    border-color: rgba(58,184,216,0.45) !important;
+    box-shadow: 0 0 0 2px rgba(58,184,216,0.1);
+  }
+
+  /* Row 1: name */
+  .entry-name {
+    font-size: 13px; color: var(--text);
+    line-height: 1.3; word-break: break-word;
+    padding-left: 6px;
+  }
+  .entry.done .entry-name { color: var(--cd-far); opacity: 0.85; }
+
+  /* Row 2: notes (optional) */
+  .entry-notes {
+    font-size: 10.5px; color: var(--text-dim);
+    font-style: italic; line-height: 1.3;
+    padding-left: 6px; word-break: break-word;
+  }
+
+  /* Row 3: meta */
+  .entry-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-left: 6px;
+    margin-top: 1px;
+  }
+
+  .entry-time, .entry-countdown {
+    font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: 0.04em;
+  }
+  .entry-time { color: var(--accent2); }
+  .entry.done .entry-time { color: var(--cd-far); opacity: 0.8; }
+
+  .cd-near { color: var(--cd-near); }
+  .cd-mid  { color: var(--cd-mid);  }
+  .cd-far  { color: var(--cd-far);  }
+
+  /* ── Context menu ── */
+  #ctx-menu {
+    position: fixed; z-index: 9999;
+    background: #12141f;
+    border: 1px solid var(--border2); border-radius: 8px;
+    padding: 4px; min-width: 175px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3);
+    display: none;
+  }
+  #ctx-menu.visible { display: block; animation: ctxFadeIn 0.1s ease; }
+
+  @keyframes ctxFadeIn {
+    from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+  }
+
+  .ctx-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 12px; border-radius: 5px;
+    cursor: pointer; font-size: 13px; color: var(--text);
+    font-family: var(--sans); transition: background 0.1s;
+  }
+  .ctx-item:hover        { background: var(--bg3); }
+  .ctx-item.danger       { color: var(--cd-near); }
+  .ctx-item.danger:hover { background: rgba(232,97,90,0.1); }
+  .ctx-divider { height: 1px; background: var(--border); margin: 3px 4px; }
+
+  .ctx-check {
+    width: 14px; height: 14px; flex-shrink: 0;
+    border: 1.5px solid var(--border2); border-radius: 3px; position: relative;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .ctx-check.checked { background: var(--cd-far); border-color: var(--cd-far); }
+  .ctx-check.checked::after {
+    content: ''; position: absolute; left: 3px; top: 1.5px;
+    width: 5px; height: 8px;
+    border: 1.5px solid var(--bg); border-top: none; border-left: none;
+    transform: rotate(45deg);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .entry { animation: fadeIn 0.14s ease; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="header-left">
+      <h1>Weekly<span>.</span>Tracker</h1>
+      <span class="header-label">countdowns for anything recurring</span>
+    </div>
+    <div class="header-mid">
+      <button class="btn-io" onclick="exportData()">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M2.5 4.5l3 3 3-3M1 9h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Export
+      </button>
+      <label class="btn-io">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 10V4M2.5 6.5l3-3 3 3M1 2h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Import
+        <input type="file" id="import-file" accept=".json" onchange="importData(this)">
+      </label>
+    </div>
+    <div class="header-right">
+      <div id="clock"></div>
+      <div id="clock-date"></div>
+    </div>
+  </header>
+
+  <div class="add-bar" id="add-bar">
+    <div class="add-row">
+      <span class="edit-label" id="edit-label">editing</span>
+      <input type="text" id="input-name" placeholder="Series name…" autocomplete="off">
+      <select id="input-day">
+        <option value="1">Monday</option>
+        <option value="2">Tuesday</option>
+        <option value="3">Wednesday</option>
+        <option value="4">Thursday</option>
+        <option value="5">Friday</option>
+        <option value="6">Saturday</option>
+        <option value="0">Sunday</option>
+      </select>
+      <input type="time" id="input-time" value="16:00">
+      <button class="btn-add" id="btn-submit" onclick="submitEntry()">+ Add</button>
+      <button class="btn-cancel" id="btn-cancel" onclick="cancelEdit()">✕ Cancel</button>
+    </div>
+    <div class="add-row">
+      <input type="text" id="input-notes" placeholder="Notes (optional) — episode count, streaming service, anything…" autocomplete="off">
+    </div>
+  </div>
+
+  <div id="schedule"></div>
+</div>
+
+<!-- Context menu -->
+<div id="ctx-menu">
+  <div class="ctx-item" onclick="ctxToggle()">
+    <div class="ctx-check" id="ctx-check-icon"></div>
+    <span id="ctx-toggle-label">Enable Highlight</span>
+  </div>
+  <div class="ctx-item" onclick="ctxEdit()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Edit
+  </div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item danger" onclick="ctxRemove()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3.5h10M5.5 3.5V2.5h3v1M5.5 6v4M8.5 6v4M3 3.5l.7 7.5h6.6l.7-7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Remove
+  </div>
+</div>
+
+<script>
+const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const STORAGE_KEY = 'ep_tracker_v3';
+const RESET_KEY   = 'ep_last_reset';
+
+let entries    = [];
+let nextId     = 1;
+let ctxId      = null;
+let editingId  = null;
+
+// ── Timezone ──────────────────────────────────────────────────────────────────
+const USER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+function nowInTZ() {
+  const now   = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: USER_TZ, year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false
+  }).formatToParts(now);
+  const g = t => parseInt(parts.find(p => p.type === t).value);
+  return new Date(Date.UTC(g('year'), g('month')-1, g('day'), g('hour'), g('minute'), g('second')));
+}
+
+function tzLabel() {
+  try {
+    return new Intl.DateTimeFormat('en', { timeZone: USER_TZ, timeZoneName:'shortOffset' })
+             .formatToParts(new Date()).find(x => x.type === 'timeZoneName')?.value || USER_TZ;
+  } catch { return USER_TZ; }
+}
+const TZ_LABEL = tzLabel();
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    if (d) { entries = d.entries || []; nextId = d.nextId || 1; }
+  } catch {}
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, nextId }));
+}
+
+// ── Midnight reset ────────────────────────────────────────────────────────────
+let _lastDateStr = '';
+function checkMidnightReset() {
+  const now = nowInTZ();
+  const ds  = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
+  if (_lastDateStr && _lastDateStr !== ds) {
+    entries.forEach(e => e.done = false);
+    save(); render();
+  }
+  _lastDateStr = ds;
+  localStorage.setItem(RESET_KEY, ds);
+}
+
+// ── Time helpers ──────────────────────────────────────────────────────────────
+function msUntilNext(day, timeStr) {
+  const now   = nowInTZ();
+  const [h,m] = timeStr.split(':').map(Number);
+  let ahead   = (day - now.getUTCDay() + 7) % 7;
+  const ch = now.getUTCHours(), cm = now.getUTCMinutes();
+  if (ahead === 0 && (ch > h || (ch === h && cm >= m))) ahead = 7;
+  const t = new Date(now);
+  t.setUTCDate(t.getUTCDate() + ahead);
+  t.setUTCHours(h, m, 0, 0);
+  return t - now;
+}
+
+function fmtCountdown(ms) {
+  const m = Math.floor(ms / 60000);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (d === 0 && h === 0) return `${m % 60}m`;
+  if (d === 0)             return `${h}h ${m % 60}m`;
+  return `${d}d ${h % 24}h`;
+}
+
+function cdCls(ms) {
+  const h = ms / 3600000;
+  return h < 6 ? 'cd-near' : h < 48 ? 'cd-mid' : 'cd-far';
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Next-up calculation ───────────────────────────────────────────────────────
+function getNextUpId() {
+  let minMs = Infinity, minId = null;
+  for (const e of entries) {
+    const ms = msUntilNext(e.day, e.time);
+    if (ms < minMs) { minMs = ms; minId = e.id; }
+  }
+  return minId;
+}
+
+// ── Full render ───────────────────────────────────────────────────────────────
+function render() {
+  const el    = document.getElementById('schedule');
+  const today = nowInTZ().getUTCDay();
+  const order = Array.from({length:7}, (_,i) => (today+i)%7);
+  const days  = order.filter(d => entries.some(e => e.day === d));
+  const nextId_up = getNextUpId();
+
+  if (!days.length) {
+    el.innerHTML = '<p class="empty-state">No entries yet — add one above.</p>';
+    return;
+  }
+
+  let html = '';
+  for (const day of days) {
+    const isToday = day === today;
+    const list    = entries.filter(e => e.day === day).sort((a,b) => a.time.localeCompare(b.time));
+
+    html += `<div class="day-col${isToday ? ' today-col' : ''}">
+      <div class="day-header">
+        <span class="day-name">${DAY_NAMES[day]}</span>
+        ${isToday ? '<span class="today-badge">today</span>' : ''}
+        <div class="day-line"></div>
+        <span class="day-count">${list.length}</span>
+      </div>
+      <div class="entries-list">`;
+
+    for (const e of list) {
+      const ms   = msUntilNext(e.day, e.time);
+      const isNext    = e.id === nextId_up;
+      const isEditing = e.id === editingId;
+      const classes   = ['entry',
+        e.done    ? 'done'           : '',
+        isNext    ? 'next-up'        : '',
+        isEditing ? 'editing-target' : ''
+      ].filter(Boolean).join(' ');
+
+      html += `<div class="${classes}" id="e${e.id}" oncontextmenu="openCtx(event,${e.id})">
+        <span class="entry-name">${esc(e.name)}</span>
+        ${e.notes ? `<span class="entry-notes">${esc(e.notes)}</span>` : ''}
+        <div class="entry-meta">
+          <span class="entry-time">${esc(e.time)}</span>
+          <span class="entry-countdown ${cdCls(ms)}" id="cd${e.id}">${fmtCountdown(ms)}</span>
+        </div>
+      </div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ── Countdown patch — no rebuild, no blink ────────────────────────────────────
+function refreshCountdowns() {
+  const nuId = getNextUpId();
+  for (const e of entries) {
+    const cdEl    = document.getElementById(`cd${e.id}`);
+    const entryEl = document.getElementById(`e${e.id}`);
+    if (cdEl) {
+      const ms  = msUntilNext(e.day, e.time);
+      const txt = fmtCountdown(ms);
+      const cls = 'entry-countdown ' + cdCls(ms);
+      if (cdEl.textContent !== txt) cdEl.textContent = txt;
+      if (cdEl.className   !== cls) cdEl.className   = cls;
+    }
+    if (entryEl) {
+      entryEl.classList.toggle('next-up', e.id === nuId);
+    }
+  }
+}
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+const ctxMenu = document.getElementById('ctx-menu');
+
+function openCtx(evt, id) {
+  evt.preventDefault();
+  evt.stopPropagation();
+  ctxId = id;
+
+  const entry = entries.find(e => e.id === id);
+  const icon  = document.getElementById('ctx-check-icon');
+  const label = document.getElementById('ctx-toggle-label');
+  icon.classList.toggle('checked', !!entry.done);
+  label.textContent = entry.done ? 'Disable Highlight' : 'Enable Highlight';
+
+  // Measure real size, then position
+  ctxMenu.style.visibility = 'hidden';
+  ctxMenu.classList.add('visible');
+  const mw = ctxMenu.offsetWidth, mh = ctxMenu.offsetHeight;
+  ctxMenu.classList.remove('visible');
+  ctxMenu.style.visibility = '';
+
+  const x = Math.min(evt.clientX, window.innerWidth  - mw - 6);
+  const y = Math.min(evt.clientY, window.innerHeight - mh - 6);
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top  = y + 'px';
+  ctxMenu.classList.add('visible');
+}
+
+function closeCtx() { ctxMenu.classList.remove('visible'); ctxId = null; }
+
+function ctxToggle() {
+  if (ctxId === null) return;
+  const e = entries.find(x => x.id === ctxId);
+  if (e) { e.done = !e.done; save(); render(); }
+  closeCtx();
+}
+
+function ctxEdit() {
+  if (ctxId === null) return;
+  const e = entries.find(x => x.id === ctxId);
+  if (!e) { closeCtx(); return; }
+
+  editingId = e.id;
+
+  document.getElementById('input-name').value  = e.name;
+  document.getElementById('input-notes').value = e.notes || '';
+  document.getElementById('input-day').value   = e.day;
+  document.getElementById('input-time').value  = e.time;
+
+  const btn = document.getElementById('btn-submit');
+  btn.textContent = 'Save Changes';
+  btn.classList.add('saving');
+  document.getElementById('btn-cancel').classList.add('visible');
+  document.getElementById('edit-label').classList.add('visible');
+  document.getElementById('add-bar').classList.add('editing');
+
+  // Highlight the entry being edited
+  render();
+  document.getElementById('input-name').focus();
+  closeCtx();
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('input-name').value  = '';
+  document.getElementById('input-notes').value = '';
+  document.getElementById('input-time').value  = '16:00';
+
+  const btn = document.getElementById('btn-submit');
+  btn.textContent = '+ Add';
+  btn.classList.remove('saving');
+  document.getElementById('btn-cancel').classList.remove('visible');
+  document.getElementById('edit-label').classList.remove('visible');
+  document.getElementById('add-bar').classList.remove('editing');
+  render();
+}
+
+function ctxRemove() {
+  if (ctxId === null) return;
+  if (editingId === ctxId) cancelEdit();
+  entries = entries.filter(x => x.id !== ctxId);
+  save(); render();
+  closeCtx();
+}
+
+document.addEventListener('click',       e => { if (!ctxMenu.contains(e.target)) closeCtx(); });
+document.addEventListener('contextmenu', e => { if (!ctxMenu.contains(e.target)) closeCtx(); });
+document.addEventListener('keydown',     e => { if (e.key === 'Escape') { closeCtx(); if (editingId) cancelEdit(); } });
+
+// ── Add / Save entry ──────────────────────────────────────────────────────────
+function submitEntry() {
+  const name  = document.getElementById('input-name').value.trim();
+  const notes = document.getElementById('input-notes').value.trim();
+  const day   = parseInt(document.getElementById('input-day').value);
+  const time  = document.getElementById('input-time').value;
+  if (!name) { document.getElementById('input-name').focus(); return; }
+
+  if (editingId !== null) {
+    const e = entries.find(x => x.id === editingId);
+    if (e) { e.name = name; e.notes = notes; e.day = day; e.time = time; }
+    cancelEdit(); // also calls render + save via flow
+    save(); render();
+  } else {
+    entries.push({ id: nextId++, day, time, name, notes, done: false });
+    document.getElementById('input-name').value  = '';
+    document.getElementById('input-notes').value = '';
+    document.getElementById('input-name').focus();
+    save(); render();
+  }
+}
+
+document.getElementById('input-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitEntry();
+});
+document.getElementById('input-notes').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitEntry();
+});
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportData() {
+  const blob = new Blob([JSON.stringify({ entries, nextId }, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'ep-tracker-backup.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Import ────────────────────────────────────────────────────────────────────
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const d = JSON.parse(evt.target.result);
+      if (!Array.isArray(d.entries)) throw new Error('Invalid format');
+      entries = d.entries;
+      nextId  = d.nextId || (Math.max(0, ...entries.map(e => e.id)) + 1);
+      save(); render();
+    } catch {
+      alert('Import failed: invalid or corrupted file.');
+    }
+    input.value = ''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
+}
+
+// ── Clock ─────────────────────────────────────────────────────────────────────
+function tick() {
+  const now = nowInTZ();
+  const p   = n => String(n).padStart(2,'0');
+  document.getElementById('clock').textContent =
+    `${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())}`;
+  document.getElementById('clock-date').textContent =
+    `${DAY_NAMES[now.getUTCDay()].toUpperCase()} · ${TZ_LABEL}`;
+  checkMidnightReset();
+}
+
+load(); render(); tick();
+setInterval(tick, 1000);
+setInterval(refreshCountdowns, 30000);
+</script>
+</body>
+</html>
