@@ -19,15 +19,30 @@
     --text:       #d4d6e8;
     --text-dim:   #6b6f8a;
     --text-dimmer:#3a3d52;
-    --done-bg:    #0d1a20;
-    --done-border:#1a3a40;
     --cd-near:    #e8615a;
-    --cd-mid:     #f0a04b;
-    --cd-far:     #4fc4a8;   /* enable highlight — green-teal */
-    --today:      #3ab8d8;   /* today column — cyan-blue teal, same family, cooler hue */
+    --cd-mid:     #d4860f;
+    --cd-far:     #4fc4a8;
+    --today:      #3ab8d8;
     --mono:   'DM Mono', monospace;
     --sans:   'Noto Sans JP', sans-serif;
     --display:'Syne', sans-serif;
+  }
+
+  [data-theme="light"] {
+    --bg:         #dde0ec;
+    --bg2:        #eceef8;
+    --bg3:        #d4d8ea;
+    --border:     #b8bcd4;
+    --border2:    #9aa0be;
+    --accent:     #c43c36;
+    --accent2:    #9e5e08;
+    --text:       #0e1020;
+    --text-dim:   #3a4060;
+    --text-dimmer:#6870a0;
+    --cd-near:    #c43c36;
+    --cd-mid:     #9e5e08;
+    --cd-far:     #1e9070;
+    --today:      #1480a8;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,12 +51,11 @@
   body::before {
     content: '';
     position: fixed; inset: 0;
-    background-image:
-      linear-gradient(var(--border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--border) 1px, transparent 1px);
-    background-size: 40px 40px;
-    opacity: 0.18;
+    background: radial-gradient(ellipse at 50% 0%, rgba(80,100,160,0.08) 0%, transparent 70%);
     pointer-events: none; z-index: 0;
+  }
+  [data-theme="light"] body::before {
+    background: radial-gradient(ellipse at 50% 0%, rgba(60,80,160,0.05) 0%, transparent 60%);
   }
 
   .shell {
@@ -61,14 +75,17 @@
   }
 
   .header-left  { display: flex; align-items: baseline; gap: 10px; }
-  .header-mid   { display: flex; gap: 6px; align-items: center; margin-left: auto; }
-  .header-right { font-family: var(--mono); text-align: right; margin-left: 16px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .header-clock { font-family: var(--mono); text-align: right; padding-left: 6px; border-left: 1px solid var(--border); }
 
   h1 { font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #fff; line-height: 1; }
+  [data-theme="light"] h1 { color: var(--text); }
   h1 span { color: var(--accent); }
-  .header-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: #7a84a8; }
+  .header-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: #9098b8; }
+  [data-theme="light"] .header-label { color: var(--text-dim); }
   #clock { font-size: 17px; font-weight: 500; color: var(--text); letter-spacing: 0.06em; }
-  #clock-date { font-size: 9px; color: #7a84a8; letter-spacing: 0.14em; margin-top: 1px; }
+  #clock-date { font-size: 9px; color: #9098b8; letter-spacing: 0.14em; margin-top: 1px; }
+  [data-theme="light"] #clock-date { color: var(--text-dim); }
 
   .btn-io {
     background: var(--bg3); border: 1px solid var(--border2);
@@ -79,19 +96,29 @@
     transition: border-color 0.15s, color 0.15s;
     white-space: nowrap;
   }
-  .btn-io:hover { border-color: var(--border2); color: var(--text); }
+  .btn-io:hover { color: var(--text); }
   .btn-io svg   { flex-shrink: 0; }
   #import-file  { display: none; }
 
   /* ── Add bar ── */
   .add-bar {
     flex-shrink: 0;
-    display: flex; flex-direction: column; gap: 5px;
+    display: flex; flex-direction: column;
+  }
+
+  /* Fields — hidden until opened */
+  .add-fields {
+    display: none;
+    flex-direction: column; gap: 5px;
     padding: 7px 0;
     border-bottom: 1px solid var(--border);
-    transition: border-color 0.2s;
+    overflow: hidden;
   }
-  .add-bar.editing { border-bottom-color: rgba(59,184,216,0.35); }
+  .add-fields.open { display: flex; }
+  .add-bar.editing .add-fields { border-bottom-color: rgba(59,184,216,0.35); }
+
+  /* btn-new-entry lives in the header now */
+  .btn-new-entry.open  { border-color: var(--accent); color: var(--accent); }
 
   .add-row { display: flex; gap: 8px; align-items: center; }
 
@@ -103,35 +130,25 @@
     transition: border-color 0.15s; height: 30px;
   }
   #input-name  { flex: 1.8; min-width: 0; }
-  #input-notes { flex: 1; min-width: 0; font-size: 12px; }
+  #input-notes { flex: 1.5; min-width: 0; font-size: 12px; }
+  #input-link  { flex: 1;   min-width: 0; font-size: 12px; }
   #input-day   { width: 115px; flex-shrink: 0; }
   #input-time  { width: 90px; flex-shrink: 0; }
   .add-bar input::placeholder { color: var(--text-dimmer); }
   .add-bar input:focus,
-  .add-bar select:focus       { border-color: var(--accent); }
+  .add-bar select:focus       { box-shadow: 0 0 0 2px rgba(255,255,255,0.04); }
   .add-bar select option      { background: var(--bg3); }
 
   .btn-add {
-    background: var(--accent); border: none; border-radius: 6px;
-    color: #fff; cursor: pointer;
-    font-family: var(--display); font-size: 12px; font-weight: 700;
-    letter-spacing: 0.04em; padding: 0 16px; height: 30px; flex-shrink: 0;
-    transition: background 0.15s, transform 0.1s;
+    background: var(--bg3); border: 1px solid var(--today);
+    border-radius: 6px; color: var(--today); cursor: pointer;
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.08em; padding: 0 14px; height: 26px; flex-shrink: 0;
+    display: flex; align-items: center;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
   }
-  .btn-add:hover  { background: #f07570; transform: translateY(-1px); }
-  .btn-add.saving { background: var(--today); }
-  .btn-add.saving:hover { background: #50c8e8; }
-
-  .btn-cancel {
-    background: none; border: 1px solid var(--border2);
-    border-radius: 6px; color: var(--text-dim); cursor: pointer;
-    font-family: var(--mono); font-size: 11px;
-    padding: 0 10px; height: 30px; flex-shrink: 0;
-    transition: border-color 0.15s, color 0.15s;
-    display: none;
-  }
-  .btn-cancel:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-cancel.visible { display: block; }
+  .btn-add:hover { background: var(--today); color: #fff; }
 
   .edit-label {
     font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
@@ -144,7 +161,7 @@
   #schedule {
     flex: 1; min-height: 0;
     display: flex; flex-direction: row;
-    gap: 0; padding: 10px 0 6px;
+    padding: 10px 0 6px;
     overflow: hidden;
   }
 
@@ -165,7 +182,7 @@
   .day-col:first-child { padding-left: 0; }
   .day-col:last-child  { border-right: none; padding-right: 0; }
 
-  /* Today column — cyan-teal (distinct from but family-matched with enable-highlight green-teal) */
+  /* Today column — cyan-teal (same family as colour tag teal, distinct hue) */
   .day-col.today-col {
     background: rgba(58, 184, 216, 0.04);
     border-radius: 8px;
@@ -190,8 +207,9 @@
   .day-name {
     font-family: var(--display); font-size: 9.5px;
     letter-spacing: 0.2em; text-transform: uppercase;
-    font-weight: 700; color: var(--text-dimmer); white-space: nowrap;
+    font-weight: 700; color: #9098b8; white-space: nowrap;
   }
+  [data-theme="light"] .day-name { color: var(--text-dim); }
   .today-col .day-name { color: var(--today); font-size: 10px; }
   .today-badge {
     font-family: var(--mono); font-size: 8px; letter-spacing: 0.12em;
@@ -199,8 +217,8 @@
     background: rgba(58,184,216,0.1); border: 1px solid rgba(58,184,216,0.25);
     border-radius: 3px; padding: 1px 5px; white-space: nowrap;
   }
-  .day-line  { flex: 1; height: 1px; background: var(--border); }
-  .today-col .day-line { background: rgba(58,184,216,0.2); }
+  .day-line  { flex: 1; height: 1px; background: var(--border2); }
+  .today-col .day-line { background: rgba(58,184,216,0.3); }
   .day-count { font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); flex-shrink: 0; }
 
   /* ── Entries ── */
@@ -214,25 +232,22 @@
     padding: 7px 10px 6px;
     display: flex; flex-direction: column; gap: 2px;
     cursor: context-menu;
-    user-select: none;
     position: relative; overflow: hidden;
-    transition: border-color 0.15s;
   }
 
   .today-col .entry  { border-color: rgba(58, 184, 216, 0.12); }
   .entry:hover       { border-color: var(--border2); }
 
-  /* Enable Highlight */
-  .entry.done {
-    background: var(--done-bg);
-    border-color: var(--done-border) !important;
-    box-shadow: 0 0 0 1px rgba(79,196,168,0.1) inset;
-  }
-  .entry.done::after {
+  /* Colour tag — left accent bar driven by --ec CSS var set inline */
+  .entry[data-ec]::after {
     content: '';
     position: absolute; left: 0; top: 0; bottom: 0;
-    width: 3px; background: var(--cd-far);
+    width: 3px; background: var(--ec);
     border-radius: 7px 0 0 7px;
+  }
+  .entry[data-ec] {
+    border-color: color-mix(in srgb, var(--ec) 30%, var(--border));
+    background: color-mix(in srgb, var(--ec) 6%, var(--bg2));
   }
 
   /* Next-up badge (::before, safe since ::after is used for done bar) */
@@ -258,7 +273,6 @@
     line-height: 1.3; word-break: break-word;
     padding-left: 6px;
   }
-  .entry.done .entry-name { color: var(--cd-far); opacity: 0.85; }
 
   /* Row 2: notes (optional) */
   .entry-notes {
@@ -278,16 +292,35 @@
     font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: 0.04em;
   }
   .entry-time { color: var(--accent2); }
-  .entry.done .entry-time { color: var(--cd-far); opacity: 0.8; }
 
   .cd-near { color: var(--cd-near); }
   .cd-mid  { color: var(--cd-mid);  }
   .cd-far  { color: var(--cd-far);  }
 
+  /* Link button — only shown when entry has a URL */
+  .entry-link-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; flex-shrink: 0;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--text-dimmer);
+    text-decoration: none;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .entry-link-btn:hover {
+    border-color: var(--today);
+    color: var(--today);
+    background: rgba(58,184,216,0.08);
+  }
+  .entry-meta-right {
+    display: flex; align-items: center; gap: 7px;
+  }
+
   /* ── Context menu ── */
   #ctx-menu {
     position: fixed; z-index: 9999;
-    background: #12141f;
+    background: var(--bg3);
     border: 1px solid var(--border2); border-radius: 8px;
     padding: 4px; min-width: 175px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3);
@@ -306,23 +339,31 @@
     cursor: pointer; font-size: 13px; color: var(--text);
     font-family: var(--sans); transition: background 0.1s;
   }
-  .ctx-item:hover        { background: var(--bg3); }
+  .ctx-item:hover        { background: var(--bg2); }
   .ctx-item.danger       { color: var(--cd-near); }
-  .ctx-item.danger:hover { background: rgba(232,97,90,0.1); }
+  .ctx-item.danger:hover { background: rgba(196,60,54,0.1); }
   .ctx-divider { height: 1px; background: var(--border); margin: 3px 4px; }
 
-  .ctx-check {
-    width: 14px; height: 14px; flex-shrink: 0;
-    border: 1.5px solid var(--border2); border-radius: 3px; position: relative;
-    transition: border-color 0.12s, background 0.12s;
+  /* Colour swatches in context menu */
+  .ctx-colors {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 12px 6px;
   }
-  .ctx-check.checked { background: var(--cd-far); border-color: var(--cd-far); }
-  .ctx-check.checked::after {
-    content: ''; position: absolute; left: 3px; top: 1.5px;
-    width: 5px; height: 8px;
-    border: 1.5px solid var(--bg); border-top: none; border-left: none;
-    transform: rotate(45deg);
+  .ctx-swatch {
+    width: 20px; height: 20px; border-radius: 50%;
+    cursor: pointer; flex-shrink: 0;
+    border: 2.5px solid transparent;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    transition: transform 0.12s;
   }
+  .ctx-swatch:hover  { transform: scale(1.18); }
+  .ctx-swatch.active { border-color: var(--text); }
+
+  .btn-theme { padding: 0; width: 26px; justify-content: center; }
+
+  /* Smooth theme transition */
+  html { transition: background-color 0.2s; }
+  .shell, .entry, .add-bar, header, .day-col, #ctx-menu { transition: background-color 0.2s, border-color 0.2s, color 0.15s; }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-3px); }
@@ -339,7 +380,11 @@
       <h1>Weekly<span>.</span>Tracker</h1>
       <span class="header-label">countdowns for anything recurring</span>
     </div>
-    <div class="header-mid">
+    <div class="header-right">
+      <button class="btn-io btn-new-entry" id="btn-new-entry" onclick="toggleAddForm()">
+        <svg id="btn-new-icon" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span id="btn-new-label">New Entry</span>
+      </button>
       <button class="btn-io" onclick="exportData()">
         <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M2.5 4.5l3 3 3-3M1 9h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Export
@@ -349,32 +394,37 @@
         Import
         <input type="file" id="import-file" accept=".json" onchange="importData(this)">
       </label>
-    </div>
-    <div class="header-right">
-      <div id="clock"></div>
-      <div id="clock-date"></div>
+      <button class="btn-io btn-theme" id="btn-theme" onclick="toggleTheme()" title="Toggle light/dark mode">
+        <svg id="theme-icon" width="13" height="13" viewBox="0 0 13 13" fill="none"></svg>
+      </button>
+      <div class="header-clock">
+        <div id="clock"></div>
+        <div id="clock-date"></div>
+      </div>
     </div>
   </header>
 
   <div class="add-bar" id="add-bar">
-    <div class="add-row">
-      <span class="edit-label" id="edit-label">editing</span>
-      <input type="text" id="input-name" placeholder="Series name…" autocomplete="off">
-      <select id="input-day">
-        <option value="1">Monday</option>
-        <option value="2">Tuesday</option>
-        <option value="3">Wednesday</option>
-        <option value="4">Thursday</option>
-        <option value="5">Friday</option>
-        <option value="6">Saturday</option>
-        <option value="0">Sunday</option>
-      </select>
-      <input type="time" id="input-time" value="16:00">
-      <button class="btn-add" id="btn-submit" onclick="submitEntry()">+ Add</button>
-      <button class="btn-cancel" id="btn-cancel" onclick="cancelEdit()">✕ Cancel</button>
-    </div>
-    <div class="add-row">
-      <input type="text" id="input-notes" placeholder="Notes (optional) — episode count, streaming service, anything…" autocomplete="off">
+    <span class="edit-label" id="edit-label">editing</span>
+    <div class="add-fields" id="add-fields">
+      <div class="add-row">
+        <input type="text" id="input-name" placeholder="Name…" autocomplete="off">
+        <select id="input-day">
+          <option value="1">Monday</option>
+          <option value="2">Tuesday</option>
+          <option value="3">Wednesday</option>
+          <option value="4">Thursday</option>
+          <option value="5">Friday</option>
+          <option value="6">Saturday</option>
+          <option value="0">Sunday</option>
+        </select>
+        <input type="time" id="input-time" value="16:00">
+        <button class="btn-add" id="btn-submit" onclick="submitEntry()">+ Add</button>
+      </div>
+      <div class="add-row">
+        <input type="text" id="input-notes" placeholder="Notes (optional)" autocomplete="off">
+        <input type="url"  id="input-link"  placeholder="Link (optional)" autocomplete="off">
+      </div>
     </div>
   </div>
 
@@ -383,10 +433,14 @@
 
 <!-- Context menu -->
 <div id="ctx-menu">
-  <div class="ctx-item" onclick="ctxToggle()">
-    <div class="ctx-check" id="ctx-check-icon"></div>
-    <span id="ctx-toggle-label">Enable Highlight</span>
+  <div class="ctx-colors">
+    <div class="ctx-swatch" id="cs1" style="background:#e05555" onclick="ctxColor('1')"></div>
+    <div class="ctx-swatch" id="cs2" style="background:#e89440" onclick="ctxColor('2')"></div>
+    <div class="ctx-swatch" id="cs3" style="background:#4db87a" onclick="ctxColor('3')"></div>
+    <div class="ctx-swatch" id="cs4" style="background:#4a9ee8" onclick="ctxColor('4')"></div>
+    <div class="ctx-swatch" id="cs5" style="background:#9b6bd4" onclick="ctxColor('5')"></div>
   </div>
+  <div class="ctx-divider"></div>
   <div class="ctx-item" onclick="ctxEdit()">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
     Edit
@@ -402,6 +456,7 @@
 const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const STORAGE_KEY = 'ep_tracker_v3';
 const RESET_KEY   = 'ep_last_reset';
+const ENTRY_COLORS = { '1':'#e05555', '2':'#e89440', '3':'#4db87a', '4':'#4a9ee8', '5':'#9b6bd4' };
 
 let entries    = [];
 let nextId     = 1;
@@ -429,11 +484,34 @@ function tzLabel() {
 }
 const TZ_LABEL = tzLabel();
 
+// ── Entry normalizer — strips legacy fields, fills missing ones ───────────────
+function normalizeEntry(e) {
+  // Drop entries missing required fields
+  if (typeof e.id !== 'number' || typeof e.day !== 'number') return null;
+  return {
+    id:    e.id,
+    day:   e.day,
+    time:  typeof e.time === 'string' ? e.time : '00:00',
+    name:  typeof e.name === 'string' ? e.name : '',
+    notes: typeof e.notes === 'string' ? e.notes : '',
+    link:  typeof e.link === 'string'  ? e.link  : '',
+    color: (e.color && ENTRY_COLORS[e.color]) ? e.color : null,
+  };
+}
+
+function normalizeEntries(arr) {
+  return arr.map(normalizeEntry).filter(Boolean);
+}
+
 // ── Storage ───────────────────────────────────────────────────────────────────
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    if (d) { entries = d.entries || []; nextId = d.nextId || 1; }
+    if (d) {
+      entries = normalizeEntries(d.entries || []);
+      nextId  = d.nextId || 1;
+      save(); // flush any legacy fields from storage
+    }
   } catch {}
 }
 function save() {
@@ -441,16 +519,17 @@ function save() {
 }
 
 // ── Midnight reset ────────────────────────────────────────────────────────────
-let _lastDateStr = '';
-function checkMidnightReset() {
-  const now = nowInTZ();
-  const ds  = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
+let _lastDateStr = localStorage.getItem(RESET_KEY) || '';
+function checkMidnightReset(now) {
+  const ds = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-${String(now.getUTCDate()).padStart(2,'0')}`;
   if (_lastDateStr && _lastDateStr !== ds) {
-    entries.forEach(e => e.done = false);
+    entries.forEach(e => { e.color = null; });
     save(); render();
   }
-  _lastDateStr = ds;
-  localStorage.setItem(RESET_KEY, ds);
+  if (_lastDateStr !== ds) {
+    _lastDateStr = ds;
+    localStorage.setItem(RESET_KEY, ds);
+  }
 }
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
@@ -500,7 +579,6 @@ function render() {
   const today = nowInTZ().getUTCDay();
   const order = Array.from({length:7}, (_,i) => (today+i)%7);
   const days  = order.filter(d => entries.some(e => e.day === d));
-  const nextId_up = getNextUpId();
 
   if (!days.length) {
     el.innerHTML = '<p class="empty-state">No entries yet — add one above.</p>';
@@ -508,6 +586,16 @@ function render() {
   }
 
   let html = '';
+  // Build countdown map in one pass — also finds nextId_up
+  const msMap = {};
+  let minMs = Infinity;
+  let nextId_up = null;
+  for (const e of entries) {
+    const ms = msUntilNext(e.day, e.time);
+    msMap[e.id] = ms;
+    if (ms < minMs) { minMs = ms; nextId_up = e.id; }
+  }
+
   for (const day of days) {
     const isToday = day === today;
     const list    = entries.filter(e => e.day === day).sort((a,b) => a.time.localeCompare(b.time));
@@ -522,21 +610,27 @@ function render() {
       <div class="entries-list">`;
 
     for (const e of list) {
-      const ms   = msUntilNext(e.day, e.time);
+      const ms   = msMap[e.id];
       const isNext    = e.id === nextId_up;
       const isEditing = e.id === editingId;
       const classes   = ['entry',
-        e.done    ? 'done'           : '',
         isNext    ? 'next-up'        : '',
         isEditing ? 'editing-target' : ''
       ].filter(Boolean).join(' ');
+      const colorHex  = e.color ? ENTRY_COLORS[e.color] : null;
+      const colorAttrs = colorHex
+        ? `data-ec="${e.color}" style="--ec:${colorHex}"`
+        : '';
 
-      html += `<div class="${classes}" id="e${e.id}" oncontextmenu="openCtx(event,${e.id})">
+      html += `<div class="${classes}" id="e${e.id}" ${colorAttrs} oncontextmenu="openCtx(event,${e.id})">
         <span class="entry-name">${esc(e.name)}</span>
         ${e.notes ? `<span class="entry-notes">${esc(e.notes)}</span>` : ''}
         <div class="entry-meta">
           <span class="entry-time">${esc(e.time)}</span>
-          <span class="entry-countdown ${cdCls(ms)}" id="cd${e.id}">${fmtCountdown(ms)}</span>
+          <div class="entry-meta-right">
+            <span class="entry-countdown ${cdCls(ms)}" id="cd${e.id}">${fmtCountdown(ms)}</span>
+            ${e.link ? `<a href="${esc(e.link)}" target="_blank" rel="noopener noreferrer" class="entry-link-btn" onclick="event.stopPropagation()" oncontextmenu="event.stopPropagation()"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M4.5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6.5M6.5 1H10m0 0v3.5M10 1L5 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></a>` : ''}
+          </div>
         </div>
       </div>`;
     }
@@ -549,20 +643,21 @@ function render() {
 
 // ── Countdown patch — no rebuild, no blink ────────────────────────────────────
 function refreshCountdowns() {
-  const nuId = getNextUpId();
+  // Single pass: compute countdown for every entry, track minimum for next-up
+  let minMs = Infinity, nuId = null;
   for (const e of entries) {
-    const cdEl    = document.getElementById(`cd${e.id}`);
-    const entryEl = document.getElementById(`e${e.id}`);
+    const ms = msUntilNext(e.day, e.time);
+    if (ms < minMs) { minMs = ms; nuId = e.id; }
+    const cdEl = document.getElementById(`cd${e.id}`);
     if (cdEl) {
-      const ms  = msUntilNext(e.day, e.time);
       const txt = fmtCountdown(ms);
       const cls = 'entry-countdown ' + cdCls(ms);
       if (cdEl.textContent !== txt) cdEl.textContent = txt;
       if (cdEl.className   !== cls) cdEl.className   = cls;
     }
-    if (entryEl) {
-      entryEl.classList.toggle('next-up', e.id === nuId);
-    }
+  }
+  for (const e of entries) {
+    document.getElementById(`e${e.id}`)?.classList.toggle('next-up', e.id === nuId);
   }
 }
 
@@ -575,10 +670,12 @@ function openCtx(evt, id) {
   ctxId = id;
 
   const entry = entries.find(e => e.id === id);
-  const icon  = document.getElementById('ctx-check-icon');
-  const label = document.getElementById('ctx-toggle-label');
-  icon.classList.toggle('checked', !!entry.done);
-  label.textContent = entry.done ? 'Disable Highlight' : 'Enable Highlight';
+  if (!entry) return;
+  document.querySelectorAll('.ctx-swatch').forEach(s => s.classList.remove('active'));
+  if (entry.color) {
+    const sw = document.getElementById(`cs${entry.color}`);
+    if (sw) sw.classList.add('active');
+  }
 
   // Measure real size, then position
   ctxMenu.style.visibility = 'hidden';
@@ -596,10 +693,10 @@ function openCtx(evt, id) {
 
 function closeCtx() { ctxMenu.classList.remove('visible'); ctxId = null; }
 
-function ctxToggle() {
+function ctxColor(key) {
   if (ctxId === null) return;
   const e = entries.find(x => x.id === ctxId);
-  if (e) { e.done = !e.done; save(); render(); }
+  if (e) { e.color = (e.color === key) ? null : key; save(); render(); }
   closeCtx();
 }
 
@@ -609,21 +706,21 @@ function ctxEdit() {
   if (!e) { closeCtx(); return; }
 
   editingId = e.id;
-
+  openAddForm();
   document.getElementById('input-name').value  = e.name;
-  document.getElementById('input-notes').value = e.notes || '';
+  document.getElementById('input-notes').value = e.notes;
+  document.getElementById('input-link').value  = e.link;
   document.getElementById('input-day').value   = e.day;
   document.getElementById('input-time').value  = e.time;
 
   const btn = document.getElementById('btn-submit');
   btn.textContent = 'Save Changes';
   btn.classList.add('saving');
-  document.getElementById('btn-cancel').classList.add('visible');
   document.getElementById('edit-label').classList.add('visible');
   document.getElementById('add-bar').classList.add('editing');
 
-  // Highlight the entry being edited
-  render();
+  // Mark the entry being edited without a full rebuild
+  document.getElementById(`e${e.id}`)?.classList.add('editing-target');
   document.getElementById('input-name').focus();
   closeCtx();
 }
@@ -632,15 +729,15 @@ function cancelEdit() {
   editingId = null;
   document.getElementById('input-name').value  = '';
   document.getElementById('input-notes').value = '';
+  document.getElementById('input-link').value  = '';
   document.getElementById('input-time').value  = '16:00';
-
+  document.getElementById('input-day').value   = '1';
   const btn = document.getElementById('btn-submit');
   btn.textContent = '+ Add';
   btn.classList.remove('saving');
-  document.getElementById('btn-cancel').classList.remove('visible');
   document.getElementById('edit-label').classList.remove('visible');
   document.getElementById('add-bar').classList.remove('editing');
-  render();
+  closeAddForm();
 }
 
 function ctxRemove() {
@@ -655,24 +752,52 @@ document.addEventListener('click',       e => { if (!ctxMenu.contains(e.target))
 document.addEventListener('contextmenu', e => { if (!ctxMenu.contains(e.target)) closeCtx(); });
 document.addEventListener('keydown',     e => { if (e.key === 'Escape') { closeCtx(); if (editingId) cancelEdit(); } });
 
-// ── Add / Save entry ──────────────────────────────────────────────────────────
+// ── Add form toggle ───────────────────────────────────────────────────────────
+function openAddForm() {
+  document.getElementById('add-fields').classList.add('open');
+  document.getElementById('btn-new-entry').classList.add('open');
+  document.getElementById('btn-new-label').textContent = 'Close';
+  document.getElementById('btn-new-icon').innerHTML = '<path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
+}
+function closeAddForm() {
+  document.getElementById('add-fields').classList.remove('open');
+  document.getElementById('btn-new-entry').classList.remove('open');
+  document.getElementById('btn-new-label').textContent = 'New Entry';
+  document.getElementById('btn-new-icon').innerHTML = '<path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>';
+}
+function toggleAddForm() {
+  const isOpen = document.getElementById('add-fields').classList.contains('open');
+  if (isOpen) {
+    // If editing, cancel edit first
+    if (editingId !== null) cancelEdit();
+    else closeAddForm();
+  } else {
+    openAddForm();
+    document.getElementById('input-name').focus();
+  }
+}
 function submitEntry() {
   const name  = document.getElementById('input-name').value.trim();
   const notes = document.getElementById('input-notes').value.trim();
+  const rawLink = document.getElementById('input-link').value.trim();
+  const link  = rawLink && !/^https?:\/\//i.test(rawLink) ? 'https://' + rawLink : rawLink;
   const day   = parseInt(document.getElementById('input-day').value);
   const time  = document.getElementById('input-time').value;
   if (!name) { document.getElementById('input-name').focus(); return; }
 
   if (editingId !== null) {
     const e = entries.find(x => x.id === editingId);
-    if (e) { e.name = name; e.notes = notes; e.day = day; e.time = time; }
-    cancelEdit(); // also calls render + save via flow
-    save(); render();
+    if (e) { e.name = name; e.notes = notes; e.link = link; e.day = day; e.time = time; }
+    cancelEdit();
+    save();
+    render();
   } else {
-    entries.push({ id: nextId++, day, time, name, notes, done: false });
+    entries.push({ id: nextId++, day, time, name, notes, link, color: null });
     document.getElementById('input-name').value  = '';
     document.getElementById('input-notes').value = '';
+    document.getElementById('input-link').value  = '';
     document.getElementById('input-name').focus();
+    closeAddForm();
     save(); render();
   }
 }
@@ -689,7 +814,7 @@ function exportData() {
   const blob = new Blob([JSON.stringify({ entries, nextId }, null, 2)], { type: 'application/json' });
   const a    = document.createElement('a');
   a.href     = URL.createObjectURL(blob);
-  a.download = 'ep-tracker-backup.json';
+  a.download = 'weekly-tracker-backup.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -703,7 +828,7 @@ function importData(input) {
     try {
       const d = JSON.parse(evt.target.result);
       if (!Array.isArray(d.entries)) throw new Error('Invalid format');
-      entries = d.entries;
+      entries = normalizeEntries(d.entries);
       nextId  = d.nextId || (Math.max(0, ...entries.map(e => e.id)) + 1);
       save(); render();
     } catch {
@@ -722,8 +847,27 @@ function tick() {
     `${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())}`;
   document.getElementById('clock-date').textContent =
     `${DAY_NAMES[now.getUTCDay()].toUpperCase()} · ${TZ_LABEL}`;
-  checkMidnightReset();
+  checkMidnightReset(now);
 }
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+const MOON_SVG = '<circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 1.5A5 5 0 0 0 6.5 11.5 5 5 0 0 1 6.5 1.5z" fill="currentColor"/>';
+const SUN_SVG  = '<circle cx="6.5" cy="6.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 1v1M6.5 11v1M1 6.5H2M11 6.5h1M2.8 2.8l.7.7M9.5 9.5l.7.7M9.5 3.5l-.7.7M3.5 9.5l-.7.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('theme-icon').innerHTML = theme === 'light' ? MOON_SVG : SUN_SVG;
+}
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  localStorage.setItem('wt_theme', next);
+  applyTheme(next);
+}
+
+// Initialise theme before render to avoid flash
+const savedTheme = localStorage.getItem('wt_theme') || 'dark';
+applyTheme(savedTheme);
 
 load(); render(); tick();
 setInterval(tick, 1000);
