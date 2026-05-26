@@ -362,7 +362,7 @@
   .btn-theme { padding: 0; width: 26px; justify-content: center; }
 
   /* Smooth theme transition */
-  html { transition: background-color 0.2s; }
+  html, body { transition: background-color 0.2s; }
   .shell, .entry, .add-bar, header, .day-col, #ctx-menu { transition: background-color 0.2s, border-color 0.2s, color 0.15s; }
 
   @keyframes fadeIn {
@@ -486,18 +486,17 @@ const $ = {
 };
 
 // ── Timezone ──────────────────────────────────────────────────────────────────
+// USER_TZ is the browser's own zone, so local getters already reflect it.
+// nowInTZ returns a synthetic Date whose UTC fields hold the local wall-clock,
+// letting the rest of the code use .getUTC* uniformly.
 const USER_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-// Formatter is created once and reused — building it is the expensive part
-const _tzFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: USER_TZ, year:'numeric', month:'2-digit', day:'2-digit',
-  hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false
-});
-
 function nowInTZ() {
-  const parts = _tzFmt.formatToParts(new Date());
-  const g = t => parseInt(parts.find(p => p.type === t).value);
-  return new Date(Date.UTC(g('year'), g('month')-1, g('day'), g('hour'), g('minute'), g('second')));
+  const d = new Date();
+  return new Date(Date.UTC(
+    d.getFullYear(), d.getMonth(), d.getDate(),
+    d.getHours(), d.getMinutes(), d.getSeconds()
+  ));
 }
 
 function tzLabel() {
@@ -612,7 +611,7 @@ function render() {
   }
   _currentNextId = nextId_up;  // HTML below bakes next-up in for this id
 
-  const order = Array.from({length:7}, (_,i) => (today+i)%7);
+  const order = [1, 2, 3, 4, 5, 6, 0];  // Mon → Sun, fixed order
   const days  = order.filter(d => byDay[d]);
 
   if (!days.length) {
