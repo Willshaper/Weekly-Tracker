@@ -455,7 +455,6 @@
 <script>
 const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const STORAGE_KEY = 'ep_tracker_v3';
-const RESET_KEY   = 'ep_last_reset';
 const ENTRY_COLORS = { '1':'#e05555', '2':'#e89440', '3':'#4db87a', '4':'#4a9ee8', '5':'#9b6bd4' };
 
 let entries    = [];
@@ -546,20 +545,6 @@ function load() {
 }
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries, nextId }));
-}
-
-// ── Midnight reset ────────────────────────────────────────────────────────────
-let _lastDateStr = localStorage.getItem(RESET_KEY) || '';
-function checkMidnightReset(now) {
-  const ds = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-${String(now.getUTCDate()).padStart(2,'0')}`;
-  if (_lastDateStr && _lastDateStr !== ds) {
-    entries.forEach(e => { e.color = null; });
-    save(); render();
-  }
-  if (_lastDateStr !== ds) {
-    _lastDateStr = ds;
-    localStorage.setItem(RESET_KEY, ds);
-  }
 }
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
@@ -877,7 +862,6 @@ function tick() {
     `${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())}`;
   $.clockDate.textContent =
     `${DAY_NAMES[now.getUTCDay()].toUpperCase()} · ${TZ_LABEL}`;
-  checkMidnightReset(now);
 }
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
