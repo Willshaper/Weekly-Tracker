@@ -454,7 +454,7 @@
 
 <script>
 const DAY_NAMES   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const STORAGE_KEY = 'ep_tracker_v3';
+const STORAGE_KEY = 'weekly_tracker';
 const ENTRY_COLORS = { '1':'#e05555', '2':'#e89440', '3':'#4db87a', '4':'#4a9ee8', '5':'#9b6bd4' };
 
 let entries    = [];
@@ -875,12 +875,12 @@ function applyTheme(theme) {
 
 function toggleTheme() {
   const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-  localStorage.setItem('wt_theme', next);
+  localStorage.setItem('weekly_tracker_theme', next);
   applyTheme(next);
 }
 
 // Initialise theme before render to avoid flash
-const savedTheme = localStorage.getItem('wt_theme') || 'dark';
+const savedTheme = localStorage.getItem('weekly_tracker_theme') || 'dark';
 applyTheme(savedTheme);
 
 load(); render(); tick();
