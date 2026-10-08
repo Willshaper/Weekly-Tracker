@@ -224,7 +224,36 @@
   .day-count { font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); flex-shrink: 0; }
 
   /* ── Entries ── */
-  .entries-list { display: flex; flex-direction: column; gap: 4px; overflow: hidden; flex: 1; }
+  /* Scrolls when a day has more than fits (e.g. with "All airing" on) */
+  .entries-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  .entries-list::-webkit-scrollbar { width: 5px; }
+  .entries-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  .entries-list > * { flex-shrink: 0; }
+
+  /* "All airing": compact one-line rows for shows you don't track (dimmed) */
+  .entry-row {
+    position: relative; display: flex; align-items: center; gap: 6px;
+    padding: 3px 6px 3px 8px; border-radius: 6px;
+    background: var(--bg3); border: 1px solid var(--border);
+    opacity: 0.6; transition: opacity 0.15s, border-color 0.15s;
+    font-size: 11.5px; line-height: 1.3; cursor: pointer;
+  }
+  .entry-row:hover { opacity: 1; border-color: var(--border2); }
+  .entry-row.aired { opacity: 0.38; }
+  .entry-row.aired:hover { opacity: 1; }
+  .entry-row.hl { border-color: color-mix(in srgb, var(--anime) 45%, var(--border)); background: color-mix(in srgb, var(--anime) 10%, var(--bg3)); opacity: 0.85; }
+  .row-time { font-family: var(--mono); font-size: 10px; color: var(--accent2); flex-shrink: 0; }
+  .row-name { flex: 1; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-ep { font-family: var(--mono); font-size: 9px; color: var(--text-dimmer); flex-shrink: 0; }
+  .row-add {
+    position: relative; z-index: 1; flex-shrink: 0;
+    width: 17px; height: 17px; padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px;
+    color: var(--text-dimmer); font-size: 13px; line-height: 1;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .row-add:hover { border-color: var(--anime); color: var(--anime); }
 
   /* ── Entry card ── */
   .entry {
@@ -446,6 +475,10 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 3l4 4 4-4"/></svg>
         Anime
       </button>
+      <button class="btn-io btn-anime" id="btn-all" onclick="toggleAllAiring()" title="Also list every show airing this week (except blacklisted), to pick ones to track">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+        <span id="btn-all-label">All airing</span>
+      </button>
       <button class="btn-io btn-new-entry" id="btn-new-entry" onclick="toggleAddForm()">
         <svg id="btn-new-icon" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span id="btn-new-label">New Entry</span>
@@ -517,28 +550,28 @@
   </div>
 </div>
 
-<!-- Context menu for tracked anime (managed on the Startpage) -->
+<!-- Context menu for anime (same actions as the Startpage's; synced to it) -->
 <div id="anime-ctx">
-  <div class="ctx-item" onclick="animeCtxTime()">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.3"/><path d="M7 4.2V7l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-    Edit time…
-  </div>
   <div class="ctx-item" onclick="animeCtxLink()">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    Edit link…
+    Edit link
   </div>
   <div class="ctx-item" onclick="animeCtxHighlight()">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.8l1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6L1.8 5.6l3.6-.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
     <span id="anime-ctx-hl">Highlight season</span>
   </div>
-  <div class="ctx-item" onclick="animeCtxOpen()">
-    <svg width="14" height="14" viewBox="0 0 11 11" fill="none"><path d="M4.5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6.5M6.5 1H10m0 0v3.5M10 1L5 6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    Open on AniList
+  <div class="ctx-item" onclick="animeCtxTrack()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.8" y="2.8" width="10.4" height="9.4" rx="1.4" stroke="currentColor" stroke-width="1.2"/><path d="M1.8 5.8h10.4M4.6 1.6v2.4M9.4 1.6v2.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    <span id="anime-ctx-track">Track</span>
+  </div>
+  <div class="ctx-item" id="anime-ctx-time" onclick="animeCtxTime()">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.2" stroke="currentColor" stroke-width="1.3"/><path d="M7 4.2V7l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    Edit time…
   </div>
   <div class="ctx-divider"></div>
-  <div class="ctx-item danger" onclick="animeCtxUntrack()">
+  <div class="ctx-item danger" onclick="animeCtxBlacklist()">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M3.5 10.5l7-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-    Untrack
+    Blacklist season
   </div>
 </div>
 
@@ -711,67 +744,159 @@ function esc(s) {
 }
 
 // ── Tracked anime (from the Startpage) ────────────────────────────────────────
-// The Startpage (same origin, so the same localStorage) writes a summary of its
-// tracked, still-airing anime to ANIME_WEEK_KEY. This page only reads it — anime
-// entries are never stored in `entries`, so they can't duplicate or be edited
-// as normal entries. Edits made here (time, link, highlight, untrack) are left as
-// a note in ANIME_EDITS_KEY — { [id]: { day, time, url, hl, track } }, every
-// field optional — for the Startpage to apply and clear. Until it does, the
-// pending values are already shown here.
+// The Startpage (same origin, so the same localStorage) writes ANIME_WEEK_KEY:
+//   shows     – its tracked, still-airing seasons (weekly slot, episode/break, links)
+//   others    – highlight/link of seasons it knows but doesn't track
+//   blacklist – season ids hidden everywhere
+// Anime are never stored in `entries`, so they can't duplicate or be exported as
+// your own. Every change made here (link, highlight, track, time, blacklist) is
+// left as a note in ANIME_EDITS_KEY — { [id]: { title, ...fields } } — for the
+// Startpage to apply and clear; until it does, the pending values show here.
+// "All airing" (header button, off on every load) additionally lists every
+// season airing this week from AniList, as compact rows to pick shows to track.
 const ANIME_WEEK_KEY  = 'startpage_anime_week';
 const ANIME_EDITS_KEY = 'startpage_anime_time_edits';
 const SHOW_ANIME_KEY  = 'weekly_tracker_show_anime';
+const ALL_AIRING_KEY  = 'weekly_tracker_allairing';   // the week's schedule, fetched at most once a day
 let showAnime = localStorage.getItem(SHOW_ANIME_KEY) !== '0';
+let showAll = false;
+let allBusy = false;
 let _items = [];        // everything rendered last time (own entries + anime), for countdown patches
+let animeTitles = {};   // id → title of every anime on screen (for edits on shows the Startpage doesn't know yet)
 let animeCtxId = null, timeModalId = null, linkModalId = null;
 
 function readJSON(key) { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch { return null; } }
 const TIME_OK = t => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
 const httpLink = u => { u = String(u || '').trim(); return !u ? '' : /^https?:\/\//i.test(u) ? u : 'https://' + u; };
-function animeShows() {
-  const week = readJSON(ANIME_WEEK_KEY);
-  return week && Array.isArray(week.shows) ? week.shows.filter(s => s && Number.isInteger(s.id) && Number.isInteger(s.day) && TIME_OK(s.time)) : [];
+const pad2 = n => String(n).padStart(2, '0');
+// Same default link as the Startpage: an r/anime search for the quoted title
+function animeSearchUrl(title) {
+  const name = String(title || '').replace(/\p{So}/gu, ' ').replace(/"/g, ' ').replace(/\s+/g, ' ').trim();
+  return 'https://www.reddit.com/r/anime/search?' + new URLSearchParams({
+    q: `"${name}" episode discussion`, restrict_sr: 'on', include_over_18: 'on', sort: 'new', t: 'week',
+  });
 }
 function fmtShortDate(sec) {
   return new Date(sec * 1000).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
-// One show with any pending (not yet applied) edits laid over it; null once untracked
-function animeShowView(s, edits) {
-  const ed = (edits || {})[s.id];
-  const v = { ...s, custom: !!s.custom };
-  if (ed && typeof ed === 'object') {
-    if (ed.track === false) return null;
-    if ('day' in ed) {
-      if (Number.isInteger(ed.day) && TIME_OK(ed.time)) { v.day = ed.day; v.time = ed.time; v.custom = true; }
-      else if (Number.isInteger(s.aniDay) && TIME_OK(s.aniTime)) { v.day = s.aniDay; v.time = s.aniTime; v.custom = false; }
-    }
-    if (typeof ed.hl === 'boolean') v.hl = ed.hl;
-    if (typeof ed.url === 'string') { v.url = ed.url.trim(); v.link = v.url ? httpLink(v.url) : s.defLink; }
+// Everything the Startpage shared + pending edits, read once per render
+function animeData() {
+  const week = readJSON(ANIME_WEEK_KEY) || {};
+  const shows = Array.isArray(week.shows) ? week.shows.filter(s => s && Number.isInteger(s.id) && Number.isInteger(s.day) && TIME_OK(s.time)) : [];
+  const others = Array.isArray(week.others) ? week.others.filter(o => o && Number.isInteger(o.id)) : [];
+  return {
+    tracked: new Map(shows.map(s => [s.id, s])),
+    others:  new Map(others.map(o => [o.id, o])),
+    black:   new Set(Array.isArray(week.blacklist) ? week.blacklist.filter(Number.isInteger) : []),
+    edits:   readJSON(ANIME_EDITS_KEY) || {},
+  };
+}
+// The current state of one season, pending edits applied
+function showState(id, D, title) {
+  const t = D.tracked.get(id), o = D.others.get(id), ed = D.edits[id] || {};
+  const st = {
+    id, title: (t || o || {}).title || title || animeTitles[id] || '',
+    tracked: !!t, hl: !!(t ? t.hl : o && o.hl), url: (t ? t.url : o && o.url) || '',
+    blacklisted: D.black.has(id), sum: t || null,
+    day: t ? t.day : null, time: t ? t.time : '', custom: !!(t && t.custom),
+  };
+  if (typeof ed.track === 'boolean') st.tracked = ed.track;
+  if (typeof ed.hl === 'boolean') st.hl = ed.hl;
+  if (typeof ed.url === 'string') st.url = ed.url.trim();
+  if (typeof ed.blacklist === 'boolean') st.blacklisted = ed.blacklist;
+  if (t && 'day' in ed) {
+    if (Number.isInteger(ed.day) && TIME_OK(ed.time)) { st.day = ed.day; st.time = ed.time; st.custom = true; }
+    else if (Number.isInteger(t.aniDay) && TIME_OK(t.aniTime)) { st.day = t.aniDay; st.time = t.aniTime; st.custom = false; }
   }
-  return v;
+  st.defLink = (t && t.defLink) || animeSearchUrl(st.title);
+  st.link = st.url ? httpLink(st.url) : st.defLink;
+  return st;
 }
-// Anime → render items (same shape as entries, plus key/anime fields)
+// "All airing" schedule: today 00:00 → +7 days, cached for the day
+function allAiringCache() {
+  const c = readJSON(ALL_AIRING_KEY), d = new Date();
+  return c && c.day === d.toDateString() && Array.isArray(c.items) ? c.items : null;
+}
+async function fetchAllAiring() {
+  if (allBusy || allAiringCache()) return;
+  allBusy = true; syncAnimeBtn();
+  try {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const from = Math.floor(start / 1000) - 1, to = from + 1 + 7 * 86400;
+    const q = 'query($p:Int,$a:Int,$b:Int){Page(page:$p,perPage:50){pageInfo{hasNextPage} airingSchedules(airingAt_greater:$a,airingAt_lesser:$b,sort:TIME){id episode airingAt media{id isAdult title{english romaji}}}}}';
+    const items = [];
+    for (let p = 1; p <= 10; p++) {
+      const res = await fetch('https://graphql.anilist.co', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ query: q, variables: { p, a: from, b: to } }),
+      });
+      const j = await res.json();
+      const pg = j && j.data && j.data.Page;
+      if (!res.ok || !pg) throw new Error('AniList request failed');
+      for (const s of pg.airingSchedules || []) {
+        const m = s.media;
+        if (!m || !Number.isInteger(m.id) || m.isAdult) continue;
+        const t = ((m.title && (m.title.english || m.title.romaji)) || '').trim();
+        if (t) items.push({ id: s.id, m: m.id, ep: Number(s.episode) || 0, at: Number(s.airingAt) || 0, t });
+      }
+      if (!pg.pageInfo.hasNextPage) break;
+    }
+    try { localStorage.setItem(ALL_AIRING_KEY, JSON.stringify({ day: new Date().toDateString(), items })); } catch {}
+  } catch { alert('Could not load the airing schedule from AniList — try again in a moment.'); showAll = false; }
+  finally { allBusy = false; syncAnimeBtn(); render(); }
+}
+function toggleAllAiring() {
+  showAll = !showAll;
+  syncAnimeBtn();
+  if (showAll) fetchAllAiring();
+  render();
+}
+
+// Anime → render items: tracked cards (same shape as entries) + "All airing" rows
 function animeItems() {
-  if (!showAnime) return [];
-  const edits = readJSON(ANIME_EDITS_KEY) || {};
-  return animeShows().map(s => animeShowView(s, edits)).filter(Boolean).map(s => ({
-    key: 'a' + s.id, animeId: s.id, anime: true, brk: !!s.brk, hl: !!s.hl, day: s.day, time: s.time,
-    name: String(s.title || ''),
-    notes: s.brk ? 'No episode this week' + (s.brk.at ? ` · next: Ep ${s.brk.ep}, ${fmtShortDate(s.brk.at)}` : '')
-                 : (s.ep ? `Episode ${s.ep}` : ''),
-    link: /^https?:\/\//i.test(s.link || '') ? s.link : '',
-    al: `https://anilist.co/anime/${s.id}`,
-  }));
-}
-// The current view of one show (for the menu and dialogs)
-function animeView(id) {
-  const s = animeShows().find(x => x.id === id);
-  return s ? animeShowView(s, readJSON(ANIME_EDITS_KEY)) : null;
+  const D = animeData(), out = [], cards = new Set();
+  animeTitles = {};
+  if (showAnime) {
+    for (const s of D.tracked.values()) {
+      const st = showState(s.id, D);
+      if (!st.tracked || st.blacklisted) continue;
+      animeTitles[s.id] = st.title; cards.add(s.id);
+      out.push({
+        key: 'a' + s.id, animeId: s.id, anime: true, brk: !!s.brk, hl: st.hl, day: st.day, time: st.time,
+        name: st.title,
+        notes: s.brk ? 'No episode this week' + (s.brk.at ? ` · next: Ep ${s.brk.ep}, ${fmtShortDate(s.brk.at)}` : '')
+                     : (s.ep ? `Episode ${s.ep}` : ''),
+        link: st.link, al: `https://anilist.co/anime/${s.id}`,
+      });
+    }
+  }
+  const sched = allAiringCache();
+  if (!sched) return out;
+  const nowS = Date.now() / 1000;
+  for (const r of sched) {
+    if (cards.has(r.m)) continue;
+    const st = showState(r.m, D, r.t);
+    if (st.blacklisted) continue;
+    const d = new Date(r.at * 1000), time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    animeTitles[r.m] = st.title;
+    if (st.tracked && showAnime) {
+      // Just tracked here, not yet synced by the Startpage: show it as a tracked card already
+      if (cards.has(r.m)) continue;
+      cards.add(r.m);
+      out.push({ key: 'a' + r.m, animeId: r.m, anime: true, brk: false, hl: st.hl, day: d.getDay(), time,
+                 name: st.title, notes: `Episode ${r.ep}`, link: st.link, al: `https://anilist.co/anime/${r.m}` });
+      continue;
+    }
+    if (!showAll || st.tracked) continue;
+    out.push({ key: 'r' + r.id, animeId: r.m, row: true, hl: st.hl, aired: r.at < nowS, day: d.getDay(), time,
+               name: st.title, ep: r.ep, al: `https://anilist.co/anime/${r.m}` });
+  }
+  return out;
 }
 // Queue an edit for the Startpage (merged with anything still pending for that show)
 function queueAnimeEdit(id, fields) {
   const edits = readJSON(ANIME_EDITS_KEY) || {};
-  edits[id] = { ...(edits[id] || {}), ...fields, at: Date.now() };
+  edits[id] = { ...(edits[id] || {}), title: animeTitles[id] || (edits[id] || {}).title || '', ...fields, at: Date.now() };
   try { localStorage.setItem(ANIME_EDITS_KEY, JSON.stringify(edits)); } catch {}
   render();
 }
@@ -780,20 +905,31 @@ function toggleAnime() {
   try { localStorage.setItem(SHOW_ANIME_KEY, showAnime ? '1' : '0'); } catch {}
   syncAnimeBtn(); render();
 }
-function syncAnimeBtn() { document.getElementById('btn-anime').classList.toggle('on', showAnime); }
+function syncAnimeBtn() {
+  document.getElementById('btn-anime').classList.toggle('on', showAnime);
+  document.getElementById('btn-all').classList.toggle('on', showAll);
+  document.getElementById('btn-all-label').textContent = allBusy ? 'Loading…' : 'All airing';
+}
+// "+" on a row: track that season
+function trackFromRow(evt, id) {
+  evt.preventDefault(); evt.stopPropagation();
+  queueAnimeEdit(id, { track: true });
+}
 // The Startpage updated the summary (or applied an edit) → re-render live
 window.addEventListener('storage', e => {
   if (e.key === ANIME_WEEK_KEY || e.key === ANIME_EDITS_KEY) render();
 });
 
-// Anime right-click menu
+// Anime right-click menu (same actions as the Startpage's)
 const animeCtx = document.getElementById('anime-ctx');
 function openAnimeCtx(evt, id) {
   evt.preventDefault(); evt.stopPropagation();
   closeCtx();
-  const v = animeView(id); if (!v) return;
+  const st = showState(id, animeData());
   animeCtxId = id;
-  document.getElementById('anime-ctx-hl').textContent = v.hl ? 'Remove highlight' : 'Highlight season';
+  document.getElementById('anime-ctx-hl').textContent    = st.hl ? 'Remove highlight' : 'Highlight season';
+  document.getElementById('anime-ctx-track').textContent = st.tracked ? 'Untrack' : 'Track';
+  document.getElementById('anime-ctx-time').style.display = st.tracked && st.sum ? '' : 'none';
   animeCtx.style.visibility = 'hidden';
   animeCtx.classList.add('visible');
   const mw = animeCtx.offsetWidth, mh = animeCtx.offsetHeight;
@@ -804,31 +940,30 @@ function openAnimeCtx(evt, id) {
   animeCtx.classList.add('visible');
 }
 function closeAnimeCtx() { animeCtx.classList.remove('visible'); animeCtxId = null; }
-function animeCtxOpen() {
-  if (animeCtxId !== null) window.open(`https://anilist.co/anime/${animeCtxId}`, '_blank', 'noopener');
-  closeAnimeCtx();
-}
 function animeCtxHighlight() {
-  const id = animeCtxId; closeAnimeCtx();
-  const v = id !== null && animeView(id); if (!v) return;
-  queueAnimeEdit(id, { hl: !v.hl });
+  const id = animeCtxId; closeAnimeCtx(); if (id === null) return;
+  queueAnimeEdit(id, { hl: !showState(id, animeData()).hl });
 }
-function animeCtxUntrack() {
-  const id = animeCtxId; closeAnimeCtx();
-  const v = id !== null && animeView(id); if (!v) return;
-  if (!confirm(`Stop tracking "${v.title}"? It's removed from the tracker and the Startpage's tracked shows.`)) return;
-  queueAnimeEdit(id, { track: false });
+function animeCtxTrack() {
+  const id = animeCtxId; closeAnimeCtx(); if (id === null) return;
+  const st = showState(id, animeData());
+  if (st.tracked && !confirm(`Stop tracking "${st.title}"? It's removed from the tracker and the Startpage's tracked shows.`)) return;
+  queueAnimeEdit(id, { track: !st.tracked });
+}
+function animeCtxBlacklist() {
+  const id = animeCtxId; closeAnimeCtx(); if (id === null) return;
+  queueAnimeEdit(id, { blacklist: true });
 }
 
-// Edit-time dialog
+// Edit-time dialog (tracked shows only)
 function animeCtxTime() {
-  const id = animeCtxId; closeAnimeCtx();
-  const v = id !== null && animeView(id); if (!v) return;
+  const id = animeCtxId; closeAnimeCtx(); if (id === null) return;
+  const st = showState(id, animeData()); if (!st.sum) return;
   timeModalId = id;
-  document.getElementById('time-modal-title').textContent = v.title;
+  document.getElementById('time-modal-title').textContent = st.title;
   const sel = document.getElementById('time-modal-day'), tin = document.getElementById('time-modal-time');
-  sel.value = v.custom ? String(v.day) : '';
-  tin.value = v.time;
+  sel.value = st.custom ? String(st.day) : '';
+  tin.value = st.time;
   syncTimeModal();
   document.getElementById('time-modal').classList.add('open');
   setTimeout(() => sel.focus(), 30);
@@ -839,7 +974,7 @@ function syncTimeModal() {
   const auto = sel.value === '';
   tin.disabled = auto;
   if (auto) {
-    const s = animeShows().find(x => x.id === timeModalId);
+    const s = animeData().tracked.get(timeModalId);
     if (s && TIME_OK(s.aniTime)) tin.value = s.aniTime;
   }
 }
@@ -856,13 +991,13 @@ document.getElementById('time-modal').addEventListener('click', e => { if (e.tar
 
 // Edit-link dialog (empty = the default Reddit search)
 function animeCtxLink() {
-  const id = animeCtxId; closeAnimeCtx();
-  const v = id !== null && animeView(id); if (!v) return;
+  const id = animeCtxId; closeAnimeCtx(); if (id === null) return;
+  const st = showState(id, animeData());
   linkModalId = id;
-  document.getElementById('link-modal-title').textContent = v.title;
+  document.getElementById('link-modal-title').textContent = st.title;
   const inp = document.getElementById('link-modal-url');
-  inp.value = v.url || '';
-  inp.placeholder = v.defLink || '';
+  inp.value = st.url || '';
+  inp.placeholder = st.defLink;
   document.getElementById('link-modal').classList.add('open');
   setTimeout(() => inp.focus(), 30);
 }
@@ -896,7 +1031,7 @@ function render() {
     (byDay[e.day] ||= []).push(e);
     const ms = msUntilNext(e.day, e.time, now);
     msMap[e.key] = ms;
-    if (!e.brk && ms < minMs) { minMs = ms; nextId_up = e.key; }
+    if (!e.brk && !e.row && ms < minMs) { minMs = ms; nextId_up = e.key; }
   }
   _currentNextId = nextId_up;  // HTML below bakes next-up in for this key
 
@@ -925,6 +1060,17 @@ function render() {
     for (const e of list) {
       const ms   = msMap[e.key];
       const isNext    = e.key === nextId_up;
+      if (e.row) {
+        // "All airing": one compact line — row opens AniList, "+" tracks the season
+        html += `<div class="entry-row${e.hl ? ' hl' : ''}${e.aired ? ' aired' : ''}" id="e${e.key}" oncontextmenu="openAnimeCtx(event,${e.animeId})" title="${esc(e.name)} — Episode ${e.ep}">
+          <a class="entry-cover" href="${esc(e.al)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(e.name)}"></a>
+          <span class="row-time">${esc(e.time)}</span>
+          <span class="row-name">${esc(e.name)}</span>
+          <span class="row-ep">E${e.ep}</span>
+          <button type="button" class="row-add" title="Track this show" onclick="trackFromRow(event,${e.animeId})">+</button>
+        </div>`;
+        continue;
+      }
       if (e.anime) {
         const svg = '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M4.5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6.5M6.5 1H10m0 0v3.5M10 1L5 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         // Card → discussion link (AniList on a break week); button → AniList
@@ -978,7 +1124,7 @@ function refreshCountdowns() {
   let minMs = Infinity, nuId = null;
   for (const e of _items) {
     const ms = msUntilNext(e.day, e.time, now);
-    if (!e.brk && ms < minMs) { minMs = ms; nuId = e.key; }
+    if (!e.brk && !e.row && ms < minMs) { minMs = ms; nuId = e.key; }
     const cdEl = document.getElementById(`cd${e.key}`);
     if (cdEl) {
       const txt = fmtCountdown(ms);
