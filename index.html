@@ -277,7 +277,7 @@
     box-shadow: inset 3px 0 0 var(--ec);
   }
 
-  /* Next-up badge — uses ::before since ::after is the colour-tag bar */
+  /* Next-up badge */
   .entry.next-up::before {
     content: '▶ next';
     position: absolute; top: 5px; right: 8px;
@@ -378,7 +378,7 @@
     background: color-mix(in srgb, var(--anime) 10%, var(--bg3));
   }
 
-  /* ── Edit-time dialog (tracked anime) ── */
+  /* ── Dialogs (anime: edit time / edit link) ── */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 10000;
     background: rgba(0,0,0,0.55);
@@ -881,7 +881,6 @@ function animeItems() {
     animeTitles[r.m] = st.title;
     if (st.tracked && showAnime) {
       // Just tracked here, not yet synced by the Startpage: show it as a tracked card already
-      if (cards.has(r.m)) continue;
       cards.add(r.m);
       out.push({ key: 'a' + r.m, animeId: r.m, anime: true, brk: false, hl: st.hl, day: d.getDay(), time,
                  name: st.title, notes: `Episode ${r.ep}`, link: st.link, al: `https://anilist.co/anime/${r.m}` });
@@ -1012,12 +1011,14 @@ document.getElementById('link-modal-url').addEventListener('keydown', e => { if 
 document.getElementById('link-modal').addEventListener('click', e => { if (e.target.id === 'link-modal') closeLinkModal(); });
 
 // ── Full render ───────────────────────────────────────────────────────────────
-// Own entries and tracked anime are rendered together; every item has a string
-// `key` (own: its id, anime: 'a' + AniList id) used for DOM ids and the next badge.
+// Own entries and anime are rendered together; every item has a string `key`
+// (own: its id, tracked anime: 'a' + AniList id, "All airing" row: 'r' + schedule id)
+// used for DOM ids and the next badge.
 function render() {
   const el    = $.schedule;
   const now   = nowInTZ();
   const today = now.getUTCDay();
+  renderedDay = today;
 
   const items = entries.map(e => ({ ...e, key: String(e.id) })).concat(animeItems());
   _items = items;
@@ -1106,7 +1107,7 @@ function render() {
           <span class="entry-time">${esc(e.time)}</span>
           <div class="entry-meta-right">
             <span class="entry-countdown ${cdCls(ms)}" id="cd${e.key}">${fmtCountdown(ms)}</span>
-            ${e.link ? `<a href="${esc(e.link)}" target="_blank" rel="noopener noreferrer" class="entry-link-btn" onclick="event.stopPropagation()" oncontextmenu="event.stopPropagation()"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M4.5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6.5M6.5 1H10m0 0v3.5M10 1L5 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></a>` : ''}
+            ${/^https?:\/\//i.test(e.link) ? `<a href="${esc(e.link)}" target="_blank" rel="noopener noreferrer" class="entry-link-btn" onclick="event.stopPropagation()" oncontextmenu="event.stopPropagation()"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M4.5 2H2a1 1 0 00-1 1v6a1 1 0 001 1h6a1 1 0 001-1V6.5M6.5 1H10m0 0v3.5M10 1L5 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></a>` : ''}
           </div>
         </div>
       </div>`;
@@ -1300,7 +1301,7 @@ function exportData() {
   a.href     = URL.createObjectURL(blob);
   a.download = 'weekly-tracker-backup.json';
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);   // revoke after the download starts, not before
 }
 
 // ── Import ────────────────────────────────────────────────────────────────────
@@ -1324,8 +1325,13 @@ function importData(input) {
 }
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
+let renderedDay = null;   // the weekday the schedule was last built for
 function tick() {
   const now = nowInTZ();
+  if (renderedDay !== null && now.getUTCDay() !== renderedDay) {   // past midnight: new "today", new day's schedule
+    if (showAll) fetchAllAiring();
+    render();
+  }
   const p   = n => String(n).padStart(2,'0');
   $.clock.textContent =
     `${p(now.getUTCHours())}:${p(now.getUTCMinutes())}:${p(now.getUTCSeconds())}`;
